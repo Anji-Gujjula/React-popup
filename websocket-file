@@ -1,4 +1,6 @@
 // server.js
+//npm install ws express multer
+
 const express = require('express');
 const multer = require('multer');
 const path = require('path');

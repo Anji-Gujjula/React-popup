@@ -1,0 +1,48 @@
+// src/FileUpload.js
+import React, { useState, useEffect } from 'react';
+import WebSocket from 'ws';
+
+const FileUpload = ({ onFilesReceived }) => {
+    const [files, setFiles] = useState([]);
+    const [ws, setWs] = useState(null);
+
+    useEffect(() => {
+        // Connect to the WebSocket server
+        const socket = new WebSocket('ws://localhost:8080');
+        setWs(socket);
+
+        // Listen for messages from the WebSocket server
+        socket.onmessage = (event) => {
+            const savedFiles = JSON.parse(event.data);
+            onFilesReceived(savedFiles);
+        };
+
+        return () => socket.close();
+    }, [onFilesReceived]);
+
+    const handleFileChange = (event) => {
+        setFiles(event.target.files);
+    };
+
+    const handleUpload = () => {
+        if (!ws) return;
+
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const fileArrayBuffer = reader.result;
+                ws.send(fileArrayBuffer);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    };
+
+    return (
+        <div>
+            <input type="file" multiple onChange={handleFileChange} />
+            <button onClick={handleUpload}>Upload Files</button>
+        </div>
+    );
+};
+
+export default FileUpload;

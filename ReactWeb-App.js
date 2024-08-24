@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Main App Component
 const App = () => {
     const [ws, setWs] = useState(null);
     const [savedFiles, setSavedFiles] = useState([]);
@@ -17,6 +16,9 @@ const App = () => {
             if (response.type === 'file_list') {
                 setSavedFiles(response.files);
                 setPopupVisible(true);
+            } else if (response.type === 'upload_success') {
+                // After a successful upload, request the file list
+                listFiles();
             }
         };
 
@@ -48,6 +50,10 @@ const App = () => {
         }
     };
 
+    const handleSave = (fileName) => {
+        alert(`File ${fileName} is confirmed as saved.`);
+    };
+
     const closePopup = () => {
         setPopupVisible(false);
     };
@@ -57,7 +63,6 @@ const App = () => {
             <h1>Upload Files</h1>
             <div>
                 <input type="file" multiple onChange={handleFileChange} />
-                <button onClick={listFiles}>Show Saved Files</button>
             </div>
 
             {popupVisible && (
@@ -67,13 +72,26 @@ const App = () => {
                     left: '20%',
                     background: 'white',
                     padding: '20px',
-                    border: '1px solid black'
+                    border: '1px solid black',
+                    zIndex: 1000,
                 }}>
                     <h2>Saved Files</h2>
                     <ul>
                         {savedFiles.map(file => (
-                            <li key={file.name}>
-                                <a href={file.url} target="_blank" rel="noopener noreferrer">{file.name}</a>
+                            <li key={file.name} style={{ marginBottom: '10px' }}>
+                                <span>{file.name}</span>
+                                <button
+                                    style={{ marginLeft: '10px' }}
+                                    onClick={() => handleSave(file.name)}
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    style={{ marginLeft: '10px' }}
+                                    onClick={() => window.open(file.url, '_blank')}
+                                >
+                                    Open
+                                </button>
                             </li>
                         ))}
                     </ul>

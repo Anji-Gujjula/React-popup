@@ -4,24 +4,24 @@ const App = () => {
     const [ws, setWs] = useState(null);
     const [savedFiles, setSavedFiles] = useState([]);
     const [popupVisible, setPopupVisible] = useState(false);
-    const [lastUploadedFile, setLastUploadedFile] = useState(null); // Track the last uploaded file
+    const [lastUploadedFile, setLastUploadedFile] = useState(null);
 
     useEffect(() => {
-        // Establish WebSocket connection
         const socket = new WebSocket('ws://localhost:8080');
         setWs(socket);
 
-        // Listen for messages from the WebSocket server
         socket.onmessage = (event) => {
             const response = JSON.parse(event.data);
             if (response.type === 'file_list') {
                 setSavedFiles(response.files);
                 setPopupVisible(true);
             } else if (response.type === 'upload_success') {
-                // After a successful upload, request the file list
                 listFiles();
             }
         };
+
+        socket.onclose = () => console.log('WebSocket closed');
+        socket.onerror = (error) => console.error('WebSocket error:', error);
 
         return () => socket.close();
     }, []);
@@ -40,7 +40,7 @@ const App = () => {
                     data: Array.from(new Uint8Array(fileData)),
                 });
                 ws.send(payload);
-                setLastUploadedFile({ name: file.name, data: new Uint8Array(fileData) }); // Store the last uploaded file
+                setLastUploadedFile({ name: file.name, data: new Uint8Array(fileData) });
             };
             reader.readAsArrayBuffer(file);
         });
@@ -53,7 +53,6 @@ const App = () => {
     };
 
     const closePopup = () => {
-        // When the user clicks "Close," send the last uploaded file to the server
         if (lastUploadedFile && ws) {
             const payload = JSON.stringify({
                 type: 'save_uploaded_file',
@@ -68,9 +67,7 @@ const App = () => {
     return (
         <div>
             <h1>Upload Files</h1>
-            <div>
-                <input type="file" multiple onChange={handleFileChange} />
-            </div>
+            <input type="file" multiple onChange={handleFileChange} />
 
             {popupVisible && (
                 <div style={{

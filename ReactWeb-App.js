@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 
 // Main App Component
 const App = () => {
-    const [files, setFiles] = useState([]);
     const [ws, setWs] = useState(null);
     const [savedFiles, setSavedFiles] = useState([]);
     const [popupVisible, setPopupVisible] = useState(false);
@@ -14,19 +13,18 @@ const App = () => {
 
         // Listen for messages from the WebSocket server
         socket.onmessage = (event) => {
-            const savedFiles = JSON.parse(event.data);
-            setSavedFiles(savedFiles);
-            setPopupVisible(true);
+            const response = JSON.parse(event.data);
+            if (response.type === 'file_list') {
+                setSavedFiles(response.files);
+                setPopupVisible(true);
+            }
         };
 
         return () => socket.close();
     }, []);
 
     const handleFileChange = (event) => {
-        setFiles(event.target.files);
-    };
-
-    const handleUpload = () => {
+        const files = event.target.files;
         if (!ws) return;
 
         Array.from(files).forEach(file => {
@@ -34,6 +32,7 @@ const App = () => {
             reader.onload = () => {
                 const fileData = reader.result;
                 const payload = JSON.stringify({
+                    type: 'upload',
                     name: file.name,
                     data: Array.from(new Uint8Array(fileData)),
                 });
@@ -41,6 +40,12 @@ const App = () => {
             };
             reader.readAsArrayBuffer(file);
         });
+    };
+
+    const listFiles = () => {
+        if (ws) {
+            ws.send(JSON.stringify({ type: 'list_files' }));
+        }
     };
 
     const closePopup = () => {
@@ -52,7 +57,7 @@ const App = () => {
             <h1>Upload Files</h1>
             <div>
                 <input type="file" multiple onChange={handleFileChange} />
-                <button onClick={handleUpload}>Upload Files</button>
+                <button onClick={listFiles}>Show Saved Files</button>
             </div>
 
             {popupVisible && (
@@ -67,7 +72,9 @@ const App = () => {
                     <h2>Saved Files</h2>
                     <ul>
                         {savedFiles.map(file => (
-                            <li key={file.name}>{file.folderName}/{file.name}</li>
+                            <li key={file.name}>
+                                <a href={file.url} target="_blank" rel="noopener noreferrer">{file.name}</a>
+                            </li>
                         ))}
                     </ul>
                     <button onClick={closePopup}>Close</button>

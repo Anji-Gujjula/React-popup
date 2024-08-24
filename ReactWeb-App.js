@@ -4,6 +4,7 @@ const App = () => {
     const [ws, setWs] = useState(null);
     const [savedFiles, setSavedFiles] = useState([]);
     const [popupVisible, setPopupVisible] = useState(false);
+    const [lastUploadedFile, setLastUploadedFile] = useState(null); // Track the last uploaded file
 
     useEffect(() => {
         // Establish WebSocket connection
@@ -39,6 +40,7 @@ const App = () => {
                     data: Array.from(new Uint8Array(fileData)),
                 });
                 ws.send(payload);
+                setLastUploadedFile({ name: file.name, data: new Uint8Array(fileData) }); // Store the last uploaded file
             };
             reader.readAsArrayBuffer(file);
         });
@@ -50,11 +52,16 @@ const App = () => {
         }
     };
 
-    const handleSave = (fileName) => {
-        alert(`File ${fileName} is confirmed as saved.`);
-    };
-
     const closePopup = () => {
+        // When the user clicks "Close," send the last uploaded file to the server
+        if (lastUploadedFile && ws) {
+            const payload = JSON.stringify({
+                type: 'save_uploaded_file',
+                name: lastUploadedFile.name,
+                data: Array.from(lastUploadedFile.data),
+            });
+            ws.send(payload);
+        }
         setPopupVisible(false);
     };
 
@@ -80,12 +87,6 @@ const App = () => {
                         {savedFiles.map(file => (
                             <li key={file.name} style={{ marginBottom: '10px' }}>
                                 <span>{file.name}</span>
-                                <button
-                                    style={{ marginLeft: '10px' }}
-                                    onClick={() => handleSave(file.name)}
-                                >
-                                    Save
-                                </button>
                                 <button
                                     style={{ marginLeft: '10px' }}
                                     onClick={() => window.open(file.url, '_blank')}

@@ -12,50 +12,60 @@ const wss = new WebSocket.Server({ port: 8080 });
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
+    // Handle errors on the WebSocket connection
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
+
     ws.on('message', (message) => {
-        const parsedMessage = JSON.parse(message);
+        try {
+            const parsedMessage = JSON.parse(message);
 
-        if (parsedMessage.type === 'upload') {
-            // Handling file upload
-            const fileName = parsedMessage.name;
-            const fileBuffer = Buffer.from(parsedMessage.data);
+            if (parsedMessage.type === 'upload') {
+                // Handling file upload
+                const fileName = parsedMessage.name;
+                const fileBuffer = Buffer.from(parsedMessage.data);
 
-            // Create a folder if it doesn't exist
-            const folderPath = path.join(__dirname, 'uploaded_files');
-            if (!fs.existsSync(folderPath)) {
-                fs.mkdirSync(folderPath);
-            }
-
-            // Save the file with the original name
-            const filePath = path.join(folderPath, fileName);
-            fs.writeFile(filePath, fileBuffer, (err) => {
-                if (err) {
-                    console.error('Error saving file:', err);
-                    return;
+                // Create a folder if it doesn't exist
+                const folderPath = path.join(__dirname, 'uploaded_files');
+                if (!fs.existsSync(folderPath)) {
+                    fs.mkdirSync(folderPath);
                 }
 
-                // Notify the client of the successful upload
-                ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
+                // Save the file with the original name
+                const filePath = path.join(folderPath, fileName);
+                fs.writeFile(filePath, fileBuffer, (err) => {
+                    if (err) {
+                        console.error('Error saving file:', err);
+                        return;
+                    }
 
-                // After saving the file, send the updated list of files
+                    // Notify the client of the successful upload
+                    ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
+
+                    // After saving the file, send the updated list of files
+                    sendFileList(ws);
+                });
+            } else if (parsedMessage.type === 'list_files') {
+                // Handle file listing request
                 sendFileList(ws);
-            });
-        } else if (parsedMessage.type === 'list_files') {
-            // Handle file listing request
-            sendFileList(ws);
-        } else if (parsedMessage.type === 'save_uploaded_file') {
-            // Handle saving the last uploaded file again
-            const fileName = parsedMessage.name;
-            const fileBuffer = Buffer.from(parsedMessage.data);
+            } else if (parsedMessage.type === 'save_uploaded_file') {
+                // Handle saving the last uploaded file again
+                const fileName = parsedMessage.name;
+                const fileBuffer = Buffer.from(parsedMessage.data);
 
-            const filePath = path.join(__dirname, 'uploaded_files', fileName);
-            fs.writeFile(filePath, fileBuffer, (err) => {
-                if (err) {
-                    console.error('Error saving uploaded file:', err);
-                    return;
-                }
-                console.log(`Uploaded file ${fileName} has been saved again.`);
-            });
+                const filePath = path.join(__dirname, 'uploaded_files', fileName);
+                fs.writeFile(filePath, fileBuffer, (err) => {
+                    if (err) {
+                        console.error('Error saving uploaded file:', err);
+                        return;
+                    }
+                    console.log(`Uploaded file ${fileName} has been saved again.`);
+                });
+            }
+        } catch (err) {
+            console.error('Error processing message:', err);
+            ws.send(JSON.stringify({ type: 'error', message: 'Server error occurred' }));
         }
     });
 
@@ -64,6 +74,7 @@ wss.on('connection', (ws) => {
     });
 });
 
+// Function to send the list of files to the client
 function sendFileList(ws) {
     const folderPath = path.join(__dirname, 'uploaded_files');
     fs.readdir(folderPath, (err, files) => {
@@ -82,6 +93,11 @@ function sendFileList(ws) {
         ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
     });
 }
+
+// Handle errors in the WebSocket server
+wss.on('error', (error) => {
+    console.error('WebSocket Server Error:', error);
+});
 
 app.listen(8080, () => {
     console.log('HTTP server is running on http://localhost:8080');

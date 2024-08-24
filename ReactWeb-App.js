@@ -32,8 +32,12 @@ const App = () => {
         Array.from(files).forEach(file => {
             const reader = new FileReader();
             reader.onload = () => {
-                const fileArrayBuffer = reader.result;
-                ws.send(fileArrayBuffer);
+                const fileData = reader.result;
+                const payload = JSON.stringify({
+                    name: file.name,
+                    data: Array.from(new Uint8Array(fileData)),
+                });
+                ws.send(payload);
             };
             reader.readAsArrayBuffer(file);
         });

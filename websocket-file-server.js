@@ -36,24 +36,25 @@ wss.on('connection', (ws) => {
 
                 // Notify the client of the successful upload
                 ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
+
+                // After saving the file, send the updated list of files
+                sendFileList(ws);
             });
         } else if (parsedMessage.type === 'list_files') {
-            // Handling file listing
-            const folderPath = path.join(__dirname, 'uploaded_files');
-            fs.readdir(folderPath, (err, files) => {
+            // Handle file listing request
+            sendFileList(ws);
+        } else if (parsedMessage.type === 'save_uploaded_file') {
+            // Handle saving the last uploaded file again
+            const fileName = parsedMessage.name;
+            const fileBuffer = Buffer.from(parsedMessage.data);
+
+            const filePath = path.join(__dirname, 'uploaded_files', fileName);
+            fs.writeFile(filePath, fileBuffer, (err) => {
                 if (err) {
-                    console.error('Error reading files:', err);
+                    console.error('Error saving uploaded file:', err);
                     return;
                 }
-
-                // Prepare file list with URLs (assuming you're serving these files via a server)
-                const fileDetails = files.map(fileName => ({
-                    name: fileName,
-                    url: `http://localhost:8080/uploaded_files/${fileName}` // Example URL
-                }));
-
-                // Send the list of files back to the client
-                ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
+                console.log(`Uploaded file ${fileName} has been saved again.`);
             });
         }
     });
@@ -63,6 +64,27 @@ wss.on('connection', (ws) => {
     });
 });
 
+function sendFileList(ws) {
+    const folderPath = path.join(__dirname, 'uploaded_files');
+    fs.readdir(folderPath, (err, files) => {
+        if (err) {
+            console.error('Error reading files:', err);
+            return;
+        }
+
+        // Prepare file list with URLs (assuming you're serving these files via a server)
+        const fileDetails = files.map(fileName => ({
+            name: fileName,
+            url: `http://localhost:8080/uploaded_files/${fileName}`
+        }));
+
+        // Send the list of files back to the client
+        ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
+    });
+}
+
 app.listen(8080, () => {
     console.log('HTTP server is running on http://localhost:8080');
 });
+
+console.log('WebSocket server is running on ws://localhost:8080');

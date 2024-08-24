@@ -7,7 +7,8 @@ const app = express();
 // Serve files from the uploaded_files directory
 app.use('/uploaded_files', express.static(path.join(__dirname, 'uploaded_files')));
 
-const wss = new WebSocket.Server({ port: 8080 });
+const PORT = 8080;
+const wss = new WebSocket.Server({ port: PORT });
 
 wss.on('connection', (ws) => {
     console.log('Client connected');
@@ -26,8 +27,9 @@ wss.on('connection', (ws) => {
                 const fileName = parsedMessage.name;
                 const fileBuffer = Buffer.from(parsedMessage.data);
 
-                // Create a folder if it doesn't exist
                 const folderPath = path.join(__dirname, 'uploaded_files');
+
+                // Ensure the folder exists
                 if (!fs.existsSync(folderPath)) {
                     fs.mkdirSync(folderPath);
                 }
@@ -37,13 +39,16 @@ wss.on('connection', (ws) => {
                 fs.writeFile(filePath, fileBuffer, (err) => {
                     if (err) {
                         console.error('Error saving file:', err);
+                        ws.send(JSON.stringify({ type: 'error', message: 'Error saving file' }));
                         return;
                     }
+
+                    console.log(`File ${fileName} uploaded successfully`);
 
                     // Notify the client of the successful upload
                     ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
 
-                    // After saving the file, send the updated list of files
+                    // Send updated list of files
                     sendFileList(ws);
                 });
             } else if (parsedMessage.type === 'list_files') {
@@ -58,6 +63,7 @@ wss.on('connection', (ws) => {
                 fs.writeFile(filePath, fileBuffer, (err) => {
                     if (err) {
                         console.error('Error saving uploaded file:', err);
+                        ws.send(JSON.stringify({ type: 'error', message: 'Error saving uploaded file' }));
                         return;
                     }
                     console.log(`Uploaded file ${fileName} has been saved again.`);
@@ -80,27 +86,13 @@ function sendFileList(ws) {
     fs.readdir(folderPath, (err, files) => {
         if (err) {
             console.error('Error reading files:', err);
+            ws.send(JSON.stringify({ type: 'error', message: 'Error reading files' }));
             return;
         }
 
-        // Prepare file list with URLs (assuming you're serving these files via a server)
         const fileDetails = files.map(fileName => ({
             name: fileName,
-            url: `http://localhost:8080/uploaded_files/${fileName}`
+            url: `http://localhost:${PORT}/uploaded_files/${fileName}`
         }));
 
-        // Send the list of files back to the client
-        ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
-    });
-}
-
-// Handle errors in the WebSocket server
-wss.on('error', (error) => {
-    console.error('WebSocket Server Error:', error);
-});
-
-app.listen(8080, () => {
-    console.log('HTTP server is running on http://localhost:8080');
-});
-
-console.log('WebSocket server is running on ws://localhost:8080');
+        ws.send(JSON.stringify({ type: 'file_lis

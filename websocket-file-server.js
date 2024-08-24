@@ -1,7 +1,11 @@
-// server.js
 const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
+const app = express();
+
+// Serve files from the uploaded_files directory
+app.use('/uploaded_files', express.static(path.join(__dirname, 'uploaded_files')));
 
 const wss = new WebSocket.Server({ port: 8080 });
 
@@ -30,8 +34,8 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                // Send a success response (optional)
-                ws.send(JSON.stringify({ status: 'success', message: 'File uploaded successfully' }));
+                // Notify the client of the successful upload
+                ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
             });
         } else if (parsedMessage.type === 'list_files') {
             // Handling file listing
@@ -59,4 +63,6 @@ wss.on('connection', (ws) => {
     });
 });
 
-console.log('WebSocket server is running on ws://localhost:8080');
+app.listen(8080, () => {
+    console.log('HTTP server is running on http://localhost:8080');
+});

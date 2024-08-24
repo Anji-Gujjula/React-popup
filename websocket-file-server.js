@@ -4,75 +4,47 @@ const path = require('path');
 const express = require('express');
 const app = express();
 
-// Serve files from the uploaded_files directory
-app.use('/uploaded_files', express.static(path.join(__dirname, 'uploaded_files')));
-
 const PORT = 8080;
+const UPLOAD_DIR = path.join(__dirname, 'uploaded_files');
+
+// Create the upload directory if it doesn't exist
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR);
+}
+
+// Serve static files from the uploaded_files directory
+app.use('/uploaded_files', express.static(UPLOAD_DIR));
+
 const wss = new WebSocket.Server({ port: PORT });
 
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    // Handle errors on the WebSocket connection
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-    });
-
     ws.on('message', (message) => {
         try {
             const parsedMessage = JSON.parse(message);
 
-            if (parsedMessage.type === 'upload') {
-                // Handling file upload
-                const fileName = parsedMessage.name;
-                const fileBuffer = Buffer.from(parsedMessage.data);
-
-                const folderPath = path.join(__dirname, 'uploaded_files');
-
-                // Ensure the folder exists
-                if (!fs.existsSync(folderPath)) {
-                    fs.mkdirSync(folderPath);
-                }
-
-                // Save the file with the original name
-                const filePath = path.join(folderPath, fileName);
-                fs.writeFile(filePath, fileBuffer, (err) => {
-                    if (err) {
-                        console.error('Error saving file:', err);
-                        ws.send(JSON.stringify({ type: 'error', message: 'Error saving file' }));
-                        return;
-                    }
-
-                    console.log(`File ${fileName} uploaded successfully`);
-
-                    // Notify the client of the successful upload
-                    ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
-
-                    // Send updated list of files
+            switch (parsedMessage.type) {
+                case 'upload':
+                    handleFileUpload(ws, parsedMessage);
+                    break;
+                case 'list_files':
                     sendFileList(ws);
-                });
-            } else if (parsedMessage.type === 'list_files') {
-                // Handle file listing request
-                sendFileList(ws);
-            } else if (parsedMessage.type === 'save_uploaded_file') {
-                // Handle saving the last uploaded file again
-                const fileName = parsedMessage.name;
-                const fileBuffer = Buffer.from(parsedMessage.data);
-
-                const filePath = path.join(__dirname, 'uploaded_files', fileName);
-                fs.writeFile(filePath, fileBuffer, (err) => {
-                    if (err) {
-                        console.error('Error saving uploaded file:', err);
-                        ws.send(JSON.stringify({ type: 'error', message: 'Error saving uploaded file' }));
-                        return;
-                    }
-                    console.log(`Uploaded file ${fileName} has been saved again.`);
-                });
+                    break;
+                case 'save_uploaded_file':
+                    handleFileSave(ws, parsedMessage);
+                    break;
+                default:
+                    ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
             }
-        } catch (err) {
-            console.error('Error processing message:', err);
+        } catch (error) {
+            console.error('Error processing message:', error);
             ws.send(JSON.stringify({ type: 'error', message: 'Server error occurred' }));
         }
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
     });
 
     ws.on('close', () => {
@@ -80,10 +52,39 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Function to send the list of files to the client
+function handleFileUpload(ws, { name, data }) {
+    const filePath = path.join(UPLOAD_DIR, name);
+    const fileBuffer = Buffer.from(data);
+
+    fs.writeFile(filePath, fileBuffer, (err) => {
+        if (err) {
+            console.error('Error saving file:', err);
+            ws.send(JSON.stringify({ type: 'error', message: 'Error saving file' }));
+            return;
+        }
+
+        console.log(`File ${name} uploaded successfully`);
+        ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
+        sendFileList(ws);
+    });
+}
+
+function handleFileSave(ws, { name, data }) {
+    const filePath = path.join(UPLOAD_DIR, name);
+    const fileBuffer = Buffer.from(data);
+
+    fs.writeFile(filePath, fileBuffer, (err) => {
+        if (err) {
+            console.error('Error saving uploaded file:', err);
+            ws.send(JSON.stringify({ type: 'error', message: 'Error saving uploaded file' }));
+            return;
+        }
+        console.log(`Uploaded file ${name} has been saved again.`);
+    });
+}
+
 function sendFileList(ws) {
-    const folderPath = path.join(__dirname, 'uploaded_files');
-    fs.readdir(folderPath, (err, files) => {
+    fs.readdir(UPLOAD_DIR, (err, files) => {
         if (err) {
             console.error('Error reading files:', err);
             ws.send(JSON.stringify({ type: 'error', message: 'Error reading files' }));
@@ -92,7 +93,19 @@ function sendFileList(ws) {
 
         const fileDetails = files.map(fileName => ({
             name: fileName,
-            url: `http://localhost:${PORT}/uploaded_files/${fileName}`
+            url: `http://localhost:${PORT}/uploaded_files/${fileName}`,
         }));
 
-        ws.send(JSON.stringify({ type: 'file_lis
+        ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
+    });
+}
+
+wss.on('error', (error) => {
+    console.error('WebSocket Server Error:', error);
+});
+
+app.listen(PORT, () => {
+    console.log(`HTTP server is running on http://localhost:${PORT}`);
+});
+
+console.log(`WebSocket server is running on ws://localhost:${PORT}`);

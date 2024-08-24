@@ -9,18 +9,20 @@ wss.on('connection', (ws) => {
     console.log('Client connected');
 
     ws.on('message', (data) => {
+        // Parse the incoming message
+        const parsedData = JSON.parse(data);
+        const fileName = parsedData.name;
+        const fileBuffer = Buffer.from(parsedData.data);
+
         // Create a folder if it doesn't exist
         const folderPath = path.join(__dirname, 'uploaded_files');
         if (!fs.existsSync(folderPath)) {
             fs.mkdirSync(folderPath);
         }
 
-        // Generate a unique file name
-        const fileName = `file_${Date.now()}.bin`;
+        // Save the file with the original name
         const filePath = path.join(folderPath, fileName);
-
-        // Save the file
-        fs.writeFile(filePath, Buffer.from(data), (err) => {
+        fs.writeFile(filePath, fileBuffer, (err) => {
             if (err) {
                 console.error('Error saving file:', err);
                 return;

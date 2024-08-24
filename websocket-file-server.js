@@ -8,30 +8,50 @@ const wss = new WebSocket.Server({ port: 8080 });
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    ws.on('message', (data) => {
-        // Parse the incoming message
-        const parsedData = JSON.parse(data);
-        const fileName = parsedData.name;
-        const fileBuffer = Buffer.from(parsedData.data);
+    ws.on('message', (message) => {
+        const parsedMessage = JSON.parse(message);
 
-        // Create a folder if it doesn't exist
-        const folderPath = path.join(__dirname, 'uploaded_files');
-        if (!fs.existsSync(folderPath)) {
-            fs.mkdirSync(folderPath);
-        }
+        if (parsedMessage.type === 'upload') {
+            // Handling file upload
+            const fileName = parsedMessage.name;
+            const fileBuffer = Buffer.from(parsedMessage.data);
 
-        // Save the file with the original name
-        const filePath = path.join(folderPath, fileName);
-        fs.writeFile(filePath, fileBuffer, (err) => {
-            if (err) {
-                console.error('Error saving file:', err);
-                return;
+            // Create a folder if it doesn't exist
+            const folderPath = path.join(__dirname, 'uploaded_files');
+            if (!fs.existsSync(folderPath)) {
+                fs.mkdirSync(folderPath);
             }
 
-            // Notify the client with file details
-            const savedFiles = [{ name: fileName, folderName: 'uploaded_files' }];
-            ws.send(JSON.stringify(savedFiles));
-        });
+            // Save the file with the original name
+            const filePath = path.join(folderPath, fileName);
+            fs.writeFile(filePath, fileBuffer, (err) => {
+                if (err) {
+                    console.error('Error saving file:', err);
+                    return;
+                }
+
+                // Send a success response (optional)
+                ws.send(JSON.stringify({ status: 'success', message: 'File uploaded successfully' }));
+            });
+        } else if (parsedMessage.type === 'list_files') {
+            // Handling file listing
+            const folderPath = path.join(__dirname, 'uploaded_files');
+            fs.readdir(folderPath, (err, files) => {
+                if (err) {
+                    console.error('Error reading files:', err);
+                    return;
+                }
+
+                // Prepare file list with URLs (assuming you're serving these files via a server)
+                const fileDetails = files.map(fileName => ({
+                    name: fileName,
+                    url: `http://localhost:8080/uploaded_files/${fileName}` // Example URL
+                }));
+
+                // Send the list of files back to the client
+                ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
+            });
+        }
     });
 
     ws.on('close', () => {

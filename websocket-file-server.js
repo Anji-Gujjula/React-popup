@@ -31,9 +31,6 @@ wss.on('connection', (ws) => {
                 case 'list_files':
                     sendFileList(ws);
                     break;
-                case 'save_uploaded_file':
-                    handleFileSave(ws, parsedMessage);
-                    break;
                 default:
                     ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
             }
@@ -41,10 +38,6 @@ wss.on('connection', (ws) => {
             console.error('Error processing message:', error);
             ws.send(JSON.stringify({ type: 'error', message: 'Server error occurred' }));
         }
-    });
-
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
     });
 
     ws.on('close', () => {
@@ -64,22 +57,7 @@ function handleFileUpload(ws, { name, data }) {
         }
 
         console.log(`File ${name} uploaded successfully`);
-        ws.send(JSON.stringify({ type: 'upload_success', message: 'File uploaded successfully' }));
         sendFileList(ws);
-    });
-}
-
-function handleFileSave(ws, { name, data }) {
-    const filePath = path.join(UPLOAD_DIR, name);
-    const fileBuffer = Buffer.from(data);
-
-    fs.writeFile(filePath, fileBuffer, (err) => {
-        if (err) {
-            console.error('Error saving uploaded file:', err);
-            ws.send(JSON.stringify({ type: 'error', message: 'Error saving uploaded file' }));
-            return;
-        }
-        console.log(`Uploaded file ${name} has been saved again.`);
     });
 }
 
@@ -99,10 +77,6 @@ function sendFileList(ws) {
         ws.send(JSON.stringify({ type: 'file_list', files: fileDetails }));
     });
 }
-
-wss.on('error', (error) => {
-    console.error('WebSocket Server Error:', error);
-});
 
 app.listen(PORT, () => {
     console.log(`HTTP server is running on http://localhost:${PORT}`);

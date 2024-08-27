@@ -1,24 +1,26 @@
-// src/FileUpload.js
 import React, { useState, useEffect } from 'react';
-import WebSocket from 'ws';
 
-const FileUpload = ({ onFilesReceived }) => {
+const FileUpload = () => {
     const [files, setFiles] = useState([]);
+    const [uploadedFiles, setUploadedFiles] = useState([]);
+    const [showPopup, setShowPopup] = useState(false);
     const [ws, setWs] = useState(null);
 
     useEffect(() => {
-        // Connect to the WebSocket server
         const socket = new WebSocket('ws://localhost:8080');
         setWs(socket);
 
-        // Listen for messages from the WebSocket server
         socket.onmessage = (event) => {
-            const savedFiles = JSON.parse(event.data);
-            onFilesReceived(savedFiles);
+            const message = JSON.parse(event.data);
+
+            if (message.type === 'file_list') {
+                setUploadedFiles(message.files);
+                setShowPopup(true);
+            }
         };
 
         return () => socket.close();
-    }, [onFilesReceived]);
+    }, []);
 
     const handleFileChange = (event) => {
         setFiles(event.target.files);
@@ -30,8 +32,13 @@ const FileUpload = ({ onFilesReceived }) => {
         Array.from(files).forEach(file => {
             const reader = new FileReader();
             reader.onload = () => {
-                const fileArrayBuffer = reader.result;
-                ws.send(fileArrayBuffer);
+                const fileData = reader.result;
+                const uploadMessage = {
+                    type: 'upload',
+                    name: file.name,
+                    data: Array.from(new Uint8Array(fileData))
+                };
+                ws.send(JSON.stringify(uploadMessage));
             };
             reader.readAsArrayBuffer(file);
         });
@@ -41,6 +48,24 @@ const FileUpload = ({ onFilesReceived }) => {
         <div>
             <input type="file" multiple onChange={handleFileChange} />
             <button onClick={handleUpload}>Upload Files</button>
+
+            {showPopup && (
+                <div className="popup">
+                    <div className="popup-content">
+                        <h3>Uploaded Files</h3>
+                        <ul>
+                            {uploadedFiles.map((file, index) => (
+                                <li key={index}>
+                                    <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                        {file.name}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                        <button onClick={() => setShowPopup(false)}>Close</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
